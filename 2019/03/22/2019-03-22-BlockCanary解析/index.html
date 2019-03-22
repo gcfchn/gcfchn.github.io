@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html>
+  
+<head><meta name="generator" content="Hexo 3.8.0">
+  <meta charset="utf-8">
+  <meta name="author" content="gcfchn">
+  
+  
+  <title>BlockCanary解析 | Hexo</title>
+
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+
+  
+    <meta name="keywords" content="源码解析,性能,源码,第三方库,">
+  
+
+  
+  <meta name="description" content="BlockCanary是一套性能监控组件，主要实现对主线程操作的完全透明的监控，输出有效的监控信息，功能包括核心监控输出文件可在后台上传，以及弹出通知并UI显示卡顿信息，可以帮助开发者快速分析、定位到卡顿问题所在，精准定位问题代码行，并具有非侵入式的特点。下面是对BlockCanary的原理和代码的解析。">
+
+  
+
+  <script src="//cdn.jsdelivr.net/npm/leancloud-storage@3.11.1/dist/av-min.js" async></script>
+
+  
+    <script type="text/javascript" src="//cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML" async></script>
+  
+
+  
+    <script src="//unpkg.com/valine/dist/Valine.min.js" async></script>
+  
+
+  
+
+  <script>
+  // theme-ad's config script
+  // it can be used in every script
+  
+  window.AD_CONFIG = {
+    leancloud: {"appid":"Hyq9wkH495DgNHWhDQCOfQSp-gzGzoHsz","appkey":"WaR7nrzhliHj9aVwdQzkdlGd","comment":true,"count":true},
+    welcome: {"enable":true,"interval":30},
+    start_time: "2016-12-10",
+    passwords: ["efe07af7441da2b69c4a41e42e73be4db47f66010a56900788a458354a7373ec", ],
+    is_post: true,
+    lock: false,
+    author: "gcfchn",
+    share: {"twitter":false,"facebook":false,"weibo":false,"qq":false,"wechat":false},
+    mathjax: true,
+    page_type: "",
+    root: "/"
+  };
+</script>
+
+  <script src="/vendor/sha256.min.js"></script>
+<script src="/js/auth.js"></script>
+<script src="/js/index.js"></script>
+<script src="/vendor/qrcode.min.js"></script>
+
+  
+    <link rel="icon" href="/images/favicon.ico">
+    <link rel="apple-touch-icon" href="/images/touch-icon.png">
+  
+
+  <link href="//netdna.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css" rel="stylesheet">
+
+  <link rel="stylesheet" href="/css/index.css">
+<link rel="stylesheet" href="/styles/components/highlight/highlight.css">
+
+  
+</head>
+  <body>
+    <header class="site-header">
+  <div class="site-header-brand">
+    
+      <span class="site-header-brand-title">
+        <a href="/">GCFCHN</a>
+      </span>
+    
+    
+      <span class="site-header-brand-motto"> | 安静写些东西</span>
+    
+  </div>
+  <div class="site-header-right">
+    <nav class="site-header-navigation">
+      
+        <a href="/" target="_self">首页</a>
+      
+        <a href="/archives/" target="_self">归档</a>
+      
+        <a href="/tags/" target="_self">标签</a>
+      
+        <a href="/categories/" target="_self">分类</a>
+      
+        <a href="/friends/" target="_self">友链</a>
+      
+        <a href="/about/" target="_self">关于</a>
+      
+    </nav>
+    <div class="site-header-btn">
+      
+        <a href="https://github.com/gcfchn" target="_blank" id="site-github">
+          <i class="fa fa-github-alt"></i>
+        </a>
+      
+      <a href="javascript:void(0);" id="site-search">
+        <i class="fa fa-search"></i>
+      </a>
+      <a href="javascript:void(0);" id="site-nav-btn">
+        <i class="fa fa-ellipsis-v"></i>
+      </a>
+    </div>
+  </div>
+</header>
+<nav class="table-content" id="site-nav">
+  <div class="table-content-title">
+    <span>导航</span>
+  </div>
+  <div class="table-content-main">
+    <ol class="toc">
+      
+        <li class="toc-item">
+          <a href="/" target="_self">
+            首页
+          </a>
+        </li>
+      
+        <li class="toc-item">
+          <a href="/archives/" target="_self">
+            归档
+          </a>
+        </li>
+      
+        <li class="toc-item">
+          <a href="/tags/" target="_self">
+            标签
+          </a>
+        </li>
+      
+        <li class="toc-item">
+          <a href="/categories/" target="_self">
+            分类
+          </a>
+        </li>
+      
+        <li class="toc-item">
+          <a href="/friends/" target="_self">
+            友链
+          </a>
+        </li>
+      
+        <li class="toc-item">
+          <a href="/about/" target="_self">
+            关于
+          </a>
+        </li>
+      
+    </ol>
+  </div>
+</nav>
+<div id="site-process"></div>
+    <main>
+      
+  <div class="passage">
+  <div class="passage-meta">
+    <span>
+      <i class="fa fa-calendar"></i>2019-03-22
+    </span>
+    
+      <span>
+        | <a href="/categories/源码解析/"><i class="fa fa-bookmark"></i>源码解析</a>
+      </span>
+    
+    
+      <span>
+        | <i class="fa fa-unlock-alt"></i>UNLOCK
+      </span>
+    
+  </div>
+  <h1 class="passage-title">
+    BlockCanary解析
+  </h1>
+  
+  <article class="passage-article">
+    <br>BlockCanary是一套性能监控组件，主要实现对主线程操作的完全透明的监控，输出有效的监控信息，功能包括核心监控输出文件可在后台上传，以及弹出通知并UI显示卡顿信息，可以帮助开发者快速分析、定位到卡顿问题所在，精准定位问题代码行，并具有非侵入式的特点。下面是对BlockCanary的原理和代码的解析。<p></p>
+<h3 id="1-基本原理"><a href="#1-基本原理" class="headerlink" title="1.基本原理"></a>1.基本原理</h3><p>每一个Android应用程序中只有一个主线程，会在主线程自动创建一个Looper，并关联一个MessageQueue消息队列，主线程的Looper会在应用的生命周期内不轮询轮消息队列，从MessageQueue取出Message并处理从实现UI的更新，并且是顺序串行执行的，那么前面一个Message还没处理完的话，loop()就会等待它处理完了才会再去执行下一个Message，如果前面一Message处理很慢，那就会造成卡顿了。</p>
+<!-- more -->
+<p>下面是Looper.loop()方法<br><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title">loop</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    ...</span><br><span class="line">    <span class="keyword">for</span> (;;) &#123;</span><br><span class="line">        <span class="comment">//取消息</span></span><br><span class="line">        Message msg = queue.next();</span><br><span class="line">        <span class="comment">//打印日志</span></span><br><span class="line">        <span class="keyword">final</span> Printer logging = me.mLogging;</span><br><span class="line">        <span class="keyword">if</span> (logging != <span class="keyword">null</span>) &#123;</span><br><span class="line">            logging.println(<span class="string">"&gt;&gt;&gt;&gt;&gt; Dispatching to "</span> + msg.target + <span class="string">" "</span> +</span><br><span class="line">                    msg.callback + <span class="string">": "</span> + msg.what);</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="comment">//消息处理</span></span><br><span class="line">        msg.target.dispatchMessage(msg);</span><br><span class="line">        <span class="keyword">if</span> (logging != <span class="keyword">null</span>) &#123;</span><br><span class="line">             logging.println(<span class="string">"&lt;&lt;&lt;&lt;&lt; Finished to "</span> + msg.target + <span class="string">" "</span> + msg.callback);</span><br><span class="line">        &#125;</span><br><span class="line">        ...</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></p>
+<p>其中的msg.target其实是一个Handler,其调用的dispatchMessage()方法的代码如下<br><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">dispatchMessage</span><span class="params">(Message msg)</span> </span>&#123; </span><br><span class="line">    <span class="keyword">if</span> (msg.callback != <span class="keyword">null</span>) &#123; </span><br><span class="line">        <span class="comment">//处理Handler.post(runnable)方式投递的消息</span></span><br><span class="line">        handleCallback(msg); </span><br><span class="line">    &#125; <span class="keyword">else</span> &#123; </span><br><span class="line">        <span class="keyword">if</span> (mCallback != <span class="keyword">null</span>) &#123; </span><br><span class="line">            <span class="comment">//处理Handler.sendMessage(msg)方式投递的消息</span></span><br><span class="line">            <span class="keyword">if</span> (mCallback.handleMessage(msg)) &#123; </span><br><span class="line">                <span class="keyword">return</span>; </span><br><span class="line">            &#125; </span><br><span class="line">        &#125; </span><br><span class="line">        handleMessage(msg); </span><br><span class="line">    &#125; </span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></p>
+<p>可以看到如果消息是通过Handler.post(runnable)方式投递到MessageQueu中的，就回调runnable#run方法；如果消息是通过Handler.sendMessage(msg)的方式投递到MessageQueu中，则回调handleMessage方法；而最终的消息回调一定发生在UI线程。因此如果应用发生卡顿的情况，一定是在dispatchMessage中执行了耗时操作。而Android提供了Looper.getMainLooper().setMessageLogging(Printer printer)，这样可以通过给主线程的Looper设置一个Printer，计算打印这两个log的时间差，就可以统计dispatchMessage方法执行的时间，如果超出设定的阀值，表示发生了卡顿，则dump出各种信息，提供开发者分析性能问题。</p>
+<h3 id="2-源码分析"><a href="#2-源码分析" class="headerlink" title="2.源码分析"></a>2.源码分析</h3><p>我们从框架的初始化方法install()开始分析BlockCanary的实现监控的过程。</p>
+<p>BlockCanary.install()方法<br><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">//主要是初始化用户配置信息及配置DisplayActivity是否可用</span></span><br><span class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">static</span> BlockCanary <span class="title">install</span><span class="params">(Context context, BlockCanaryContext    blockCanaryContext)</span> </span>&#123;</span><br><span class="line">    <span class="comment">//blockCanaryContext是用户配置的参，数包括阈值、用户id、网络类型等</span></span><br><span class="line">    BlockCanaryContext.init(context, blockCanaryContext);</span><br><span class="line">    <span class="comment">//根据用户设置的是否打开显示通知来设置DisplayActivity是否可用，DisplayActivity是展示监控信息的Activity</span></span><br><span class="line">    setEnabled(context, DisplayActivity.class, BlockCanaryContext.get().displayNotification());</span><br><span class="line">    <span class="comment">//实例化BlockCanary</span></span><br><span class="line">    <span class="keyword">return</span> get();</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title">setEnabled</span><span class="params">(Context context,</span></span></span><br><span class="line"><span class="function"><span class="params">                               <span class="keyword">final</span> Class&lt;?&gt; componentClass,</span></span></span><br><span class="line"><span class="function"><span class="params">                               <span class="keyword">final</span> <span class="keyword">boolean</span> enabled)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">final</span> Context appContext = context.getApplicationContext();</span><br><span class="line">    <span class="comment">//在io线程执行</span></span><br><span class="line">    executeOnFileIoThread(<span class="keyword">new</span> Runnable() &#123;</span><br><span class="line">        <span class="meta">@Override</span></span><br><span class="line">        <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">run</span><span class="params">()</span> </span>&#123;</span><br><span class="line">            setEnabledBlocking(appContext, componentClass, enabled);</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;);</span><br><span class="line">&#125;</span><br><span class="line"> </span><br><span class="line"><span class="function"><span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title">setEnabledBlocking</span><span class="params">(Context appContext,Class&lt;?&gt; componentClass,<span class="keyword">boolean</span> enabled)</span> </span>&#123;</span><br><span class="line">    ComponentName component = <span class="keyword">new</span> ComponentName(appContext, componentClass);</span><br><span class="line">    PackageManager packageManager = appContext.getPackageManager();</span><br><span class="line">    <span class="keyword">int</span> newState = enabled ? COMPONENT_ENABLED_STATE_ENABLED : COMPONENT_ENABLED_STATE_DISABLED;</span><br><span class="line">    <span class="comment">//设置DisplayActivity是否可用</span></span><br><span class="line">    packageManager.setComponentEnabledSetting(component, newState, DONT_KILL_APP);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></p>
+<p>BlockCanary对象通过单例实例化，主要为核心类BlockCanaryInternals的初始化调用，及为BlockCanaryInternals添加ui卡顿时拦截器<br><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">private</span> <span class="title">BlockCanary</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    <span class="comment">//BlockCanaryInternals为核心处理类</span></span><br><span class="line">    BlockCanaryInternals.setContext(BlockCanaryContext.get());</span><br><span class="line">    mBlockCanaryCore = BlockCanaryInternals.getInstance();</span><br><span class="line">    <span class="comment">//为BlockCanaryInternals添加拦截器，BlockCanaryContext.get()对BlockInterceptor的默认实现是空的，实现该方法可自己处理卡顿后的逻辑</span></span><br><span class="line">    mBlockCanaryCore.addBlockInterceptor(BlockCanaryContext.get());</span><br><span class="line">    <span class="keyword">if</span> (!BlockCanaryContext.get().displayNotification()) &#123;</span><br><span class="line">        <span class="keyword">return</span>;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="comment">//添加拦截器，当发生卡顿时发送通知栏消息</span></span><br><span class="line">    mBlockCanaryCore.addBlockInterceptor(<span class="keyword">new</span> DisplayService());</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></p>
+<p>核心类BlockCanaryInternals的初始化<br><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">public</span> <span class="title">BlockCanaryInternals</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    <span class="comment">//构造线程堆栈采样器</span></span><br><span class="line">    stackSampler = <span class="keyword">new</span> StackSampler(</span><br><span class="line">            Looper.getMainLooper().getThread(),</span><br><span class="line">            sContext.provideDumpInterval());</span><br><span class="line"></span><br><span class="line">    <span class="comment">//构造CPU采样器</span></span><br><span class="line">    cpuSampler = <span class="keyword">new</span> CpuSampler(sContext.provideDumpInterval());</span><br><span class="line">    </span><br><span class="line">    <span class="comment">//通过Looper.getMainLooper().setMessageLogging(Printer printer)，设置一个主线程的Looper的Printer，实现了android.util.Printer，重写print(String x)方法</span></span><br><span class="line">    setMonitor(<span class="keyword">new</span> LooperMonitor(<span class="keyword">new</span> LooperMonitor.BlockListener() &#123;</span><br><span class="line">        <span class="comment">//当发生卡顿时回调该方法</span></span><br><span class="line">        <span class="meta">@Override</span></span><br><span class="line">        <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">onBlockEvent</span><span class="params">(<span class="keyword">long</span> realTimeStart, <span class="keyword">long</span> realTimeEnd,</span></span></span><br><span class="line"><span class="function"><span class="params">                                 <span class="keyword">long</span> threadTimeStart, <span class="keyword">long</span> threadTimeEnd)</span> </span>&#123;</span><br><span class="line">            <span class="comment">// Get recent thread-stack entries and cpu usage</span></span><br><span class="line">            ArrayList&lt;String&gt; threadStackEntries = stackSampler</span><br><span class="line">                    .getThreadStackEntries(realTimeStart, realTimeEnd);</span><br><span class="line">            <span class="keyword">if</span> (!threadStackEntries.isEmpty()) &#123;</span><br><span class="line">                <span class="comment">//合成卡顿日志</span></span><br><span class="line">                BlockInfo blockInfo = BlockInfo.newInstance()</span><br><span class="line">                        .setMainThreadTimeCost(realTimeStart, realTimeEnd, threadTimeStart, threadTimeEnd)</span><br><span class="line">                        .setCpuBusyFlag(cpuSampler.isCpuBusy(realTimeStart, realTimeEnd))</span><br><span class="line">                        .setRecentCpuRate(cpuSampler.getCpuRateInfo())</span><br><span class="line">                        .setThreadStackEntries(threadStackEntries)</span><br><span class="line">                        .flushString();</span><br><span class="line">                <span class="comment">//写卡顿日志到SD卡</span></span><br><span class="line">                LogWriter.save(blockInfo.toString());</span><br><span class="line">                <span class="comment">//回调添加的卡顿通知的拦截器</span></span><br><span class="line">                <span class="keyword">if</span> (mInterceptorChain.size() != <span class="number">0</span>) &#123;</span><br><span class="line">                    <span class="keyword">for</span> (BlockInterceptor interceptor : mInterceptorChain) &#123;</span><br><span class="line">                        interceptor.onBlock(getContext().provideContext(), blockInfo);</span><br><span class="line">                    &#125;</span><br><span class="line">                &#125;</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;, getContext().provideBlockThreshold(), getContext().stopWhenDebugging()));</span><br><span class="line"> </span><br><span class="line">    LogWriter.cleanObsolete();</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></p>
+<p>调用BlockCanary的start方法,将在BlockCanaryInternals中创建的LooperMonitor给主线程Looper的mLogging变量赋值。这样主线程Looper就可以消息分发前后使用LooperMonitor#println输出日志。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">start</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    <span class="keyword">if</span> (!mMonitorStarted) &#123;</span><br><span class="line">        mMonitorStarted = <span class="keyword">true</span>;</span><br><span class="line">        <span class="comment">//设置一个我们自定义的主线程的Looper的Printer</span></span><br><span class="line">        Looper.getMainLooper().setMessageLogging(mBlockCanaryCore.monitor);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>根据上面原理的分析，监控的对象主要是Main Looper的Message分发耗时情况。主线程的所有消息都在这里调度。<br>每从MessageQueu中取出一个消息，由于我们设置了Printer为LooperMonitor，因此在调用dispatchMessage前后都可以交由我们LooperMonitor接管，由LooperMonitor.println()处理。对于单个Message而言，logging.println(“ Dispatching”）及logging.println(Finished)成对出现，则这个方法一定的成对调用的<br>第一次调用时，记录开始时间，并开始dump堆栈和CPU信息。<br><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">//LooperMonitor</span></span><br><span class="line"><span class="meta">@Override</span></span><br><span class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">println</span><span class="params">(String x)</span> </span>&#123;</span><br><span class="line">    <span class="comment">//Debug模式下不开启监控的开关</span></span><br><span class="line">    <span class="keyword">if</span> (mStopWhenDebugging &amp;&amp; Debug.isDebuggerConnected()) &#123;</span><br><span class="line">        <span class="keyword">return</span>;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">if</span> (!mPrintingStarted) &#123;</span><br><span class="line">        <span class="comment">//第一次调用时走该分支</span></span><br><span class="line">        mStartTimestamp = System.currentTimeMillis();</span><br><span class="line">        mStartThreadTimestamp = SystemClock.currentThreadTimeMillis();</span><br><span class="line">        mPrintingStarted = <span class="keyword">true</span>;</span><br><span class="line">        <span class="comment">//开始堆栈信息的dump</span></span><br><span class="line">        startDump();</span><br><span class="line">    &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">         <span class="comment">//第二次调用时走该分支</span></span><br><span class="line">        <span class="keyword">final</span> <span class="keyword">long</span> endTime = System.currentTimeMillis();</span><br><span class="line">        mPrintingStarted = <span class="keyword">false</span>;</span><br><span class="line">        <span class="keyword">if</span> (isBlock(endTime)) &#123;</span><br><span class="line">            <span class="comment">//回调onBlockEvent，生成日志，写日志并发送卡顿通知</span></span><br><span class="line">            notifyBlockEvent(endTime);</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="comment">//停止堆栈信息的dump的任务</span></span><br><span class="line">        stopDump();</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="comment">//第二次与第一次的时间间隔是否会超过阀值</span></span><br><span class="line">    <span class="function"><span class="keyword">private</span> <span class="keyword">boolean</span> <span class="title">isBlock</span><span class="params">(<span class="keyword">long</span> endTime)</span> </span>&#123;</span><br><span class="line">        <span class="keyword">return</span> endTime - mStartTimestamp &gt; mBlockThresholdMillis;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br></pre></td><td class="code"><pre><span class="line">//LooperMonitor</span><br><span class="line">//开始dump堆栈和CPU信息采样</span><br><span class="line">private void startDump() &#123;</span><br><span class="line">    //堆栈信息采样</span><br><span class="line">    if (null != BlockCanaryInternals.getInstance().stackSampler) &#123;</span><br><span class="line">        BlockCanaryInternals.getInstance().stackSampler.start();</span><br><span class="line">    &#125;</span><br><span class="line"> </span><br><span class="line">    //CPU信息采样</span><br><span class="line">    if (null != BlockCanaryInternals.getInstance().cpuSampler) &#123;</span><br><span class="line">        BlockCanaryInternals.getInstance().cpuSampler.start();</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line">  </span><br><span class="line">//AbstractSampler</span><br><span class="line">public void start() &#123;</span><br><span class="line">    if (mShouldSample.get()) &#123;</span><br><span class="line">        return;</span><br><span class="line">    &#125;</span><br><span class="line">    mShouldSample.set(true);</span><br><span class="line"> </span><br><span class="line">    HandlerThreadFactory.getTimerThreadHandler().removeCallbacks(mRunnable);</span><br><span class="line">    HandlerThreadFactory.getTimerThreadHandler().postDelayed(mRunnable,</span><br><span class="line">            BlockCanaryInternals.getInstance().getSampleDelay());</span><br><span class="line">&#125;</span><br><span class="line">  </span><br><span class="line">//每隔采样时间进行一次采样,采样时间为设置的卡顿阈值的0.8倍</span><br><span class="line">private Runnable mRunnable = new Runnable() &#123;</span><br><span class="line">    @Override</span><br><span class="line">    public void run() &#123;</span><br><span class="line">        doSample();</span><br><span class="line">        if (mShouldSample.get()) &#123;</span><br><span class="line">            HandlerThreadFactory.getTimerThreadHandler()</span><br><span class="line">                    .postDelayed(mRunnable, mSampleInterval);</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+<p>两种采样依次提交到HandlerThread中进行，从而保证采样过程是在一个后台线程执行，并且不会被主线程堵塞。<br>两种采样方法有个共同的父类AbstractSampler，采用了模板方法模式，即在父类定义了采样的抽象算法doSample及采样生命周期的管控（start和stop），不同的子类采样的算法实现是不一样的。采样时间为设置的卡顿阈值的0.8倍。通过0.8 <em> mSampleInterval（卡顿时长阀值）后的去获取线程的堆栈信息并保存到sStackMap中，这里的意思是，我们认为方法执行超过mSampleInterval就表示卡顿，当方法执行时间已经到了mSampleInterval的0.8倍的时候还没执行完，那么这时候就开始采集方法执行堆栈信息了，如果方法在0.9 </em> mSampleInterval的时候执行完成，那么不会警告卡顿，但是如果方法执行耗时超过mSampleInterval，那就把0.8 <em> mSampleInterval这个时间点的堆栈信息认为是造成耗时原因的堆栈信息，而且，这里只要方法还没执行完，就会间隔mSampleInterval去再次获取函数执行堆栈信息并保存，这里之所以遥在0.8 </em> mSampleInterval的时候就去获取堆栈信息时为了获取到准确的堆栈信息，因为既然函数耗时已经达到0.8 * mSampleInterval了，并且函数还没执行结束，那么很大概率上会导致卡顿了，所以提前获取函数执行堆栈保证获取到造成卡顿的函数调用堆栈的正确性，后面又不断间隔mSampleInterval去获取函数执行堆栈式要获取到更多完整的堆栈信息，当方法执行完成后就会停止获取函数执行堆栈了，所有的函数执行堆栈信息最多存100条，也就是最多有100个函数调用堆栈，以当前的时间戳作为key，当监测到卡顿的时候，要把之前保存在sStackMap的函数堆栈信息展示通知出来，通过时间戳就能取到。</p>
+<p>堆栈采样很简单，直接通过Main Looper获取到主线程Thread对象，调用Thread#getStackTrace即可获取到堆栈信息。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@Override</span></span><br><span class="line"><span class="function"><span class="keyword">protected</span> <span class="keyword">void</span> <span class="title">doSample</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    StringBuilder stringBuilder = <span class="keyword">new</span> StringBuilder();</span><br><span class="line"> </span><br><span class="line">    <span class="keyword">for</span> (StackTraceElement stackTraceElement : mCurrentThread.getStackTrace()) &#123;</span><br><span class="line">        stringBuilder</span><br><span class="line">                .append(stackTraceElement.toString())</span><br><span class="line">                .append(BlockInfo.SEPARATOR);</span><br><span class="line">    &#125;</span><br><span class="line"> </span><br><span class="line">    <span class="keyword">synchronized</span> (sStackMap) &#123;</span><br><span class="line">        <span class="keyword">if</span> (sStackMap.size() == mMaxEntryCount &amp;&amp; mMaxEntryCount &gt; <span class="number">0</span>) &#123;</span><br><span class="line">            sStackMap.remove(sStackMap.keySet().iterator().next());</span><br><span class="line">        &#125;</span><br><span class="line">        sStackMap.put(System.currentTimeMillis(), stringBuilder.toString());</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>cpu的采样是采集当前cpu的使用率，如果cpu使用率太高，可能会导致cpu处理来不及，所以函数执行到一半可能暂时挂起，等待cpu重新调度。主要通过统计/proc/stat（CPU的活动信息）及/proc/pid/stat文件（该文件包含了某一进程所有的活动的信息）中的时间，计算各个时间量utime、stime、cutime、cstime的占比得到。</p>
+  </article>
+  <aside class="table-content" id="site-toc">
+  <div class="table-content-title">
+    <i class="fa fa-arrow-right fa-lg" id="site-toc-hide-btn"></i>
+    <span>目录</span>
+  </div>
+  <div class="table-content-main">
+    <ol class="toc"><li class="toc-item toc-level-3"><a class="toc-link" href="#1-基本原理"><span class="toc-text">1.基本原理</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#2-源码分析"><span class="toc-text">2.源码分析</span></a></li></ol>
+  </div>
+</aside>
+  
+    <aside class="passage-copyright">
+      <div>本文作者: gcfchn</div>
+      
+        <div>
+          原文链接: 
+          <a href target="_blank">http://yoursite.com/2019/03/22/2019-03-22-BlockCanary解析/</a>
+        </div>
+      
+      <div>
+        著作权归作者所有。商业转载请联系作者获得授权，非商业转载请注明出处。
+      </div>
+    </aside>
+  
+  
+    <div class="passage-tags">
+     
+      <a href="/tags/性能/"><i class="fa fa-tags"></i>性能</a>
+     
+      <a href="/tags/源码/"><i class="fa fa-tags"></i>源码</a>
+     
+      <a href="/tags/第三方库/"><i class="fa fa-tags"></i>第三方库</a>
+    
+    </div>
+  
+</div>
+
+    </main>
+    
+      
+<div class="site-comment-contanier" data-plateform="leancloud">
+  
+    <p id="site-comment-info">
+      <i class="fa fa-spinner fa-spin"></i> 评论加载中
+    </p>
+    <div id="site-comment"></div>
+  
+</div>
+    
+    <div class="site-footer-wrapper">
+  <footer class="site-footer">
+    
+      <div class="site-footer-col">
+        <h5 class="site-footer-title">博客推荐</h5>
+        
+          <span class="site-footer-item">
+            <a href="https://godbmw.com/" target="_blank">GodBMW</a>
+          </span>
+        
+          <span class="site-footer-item">
+            <a href="http://ruanyifeng.com/" target="_blank">阮一峰的个人网站</a>
+          </span>
+        
+      </div>
+    
+      <div class="site-footer-col">
+        <h5 class="site-footer-title">系列教程</h5>
+        
+          <span class="site-footer-item">
+            <a href="https://godbmw.com/categories/webpack4%E7%B3%BB%E5%88%97%E6%95%99%E7%A8%8B/" target="_blank">webpack4系列教程</a>
+          </span>
+        
+          <span class="site-footer-item">
+            <a href="https://godbmw.com/design-patterns/" target="_blank">设计模式手册</a>
+          </span>
+        
+      </div>
+    
+      <div class="site-footer-col">
+        <h5 class="site-footer-title">抓到我</h5>
+        
+          <span class="site-footer-item">
+            <a href="https://juejin.im/user/5b91fcf06fb9a05d3c7fd4a5" target="_blank">掘金</a>
+          </span>
+        
+          <span class="site-footer-item">
+            <a href="https://segmentfault.com/" target="_blank">思否</a>
+          </span>
+        
+      </div>
+    
+    <div class="site-footer-info">
+      <i class="fa fa-clock-o"></i> 本站已稳定运行<span id="site-time"></span>
+    </div>
+    
+      <div class="site-footer-info">
+        <i class="fa fa-paw"></i> 您是本站第 <span id="site-count"></span> 位访客
+      </div>
+    
+    
+      <div class="site-footer-info">
+        <i class="fa fa-at"></i> Email: yuanxin.me@gmail.com
+      </div>
+    
+    <div class="site-footer-info">
+      <i class="fa fa-copyright"></i> 
+      2019 <a href="https://github.com/dongyuanxin/theme-ad/" target="_blank">Theme-AD</a>.
+      Created by <a href="https://godbmw.com/" target="_blank">GodBMW</a>.
+      All rights reserved.
+    </div>
+  </footer>
+</div>
+    <div id="site-layer" style="display:none;">
+  <div class="site-layer-content">
+    <div class="site-layer-header">
+      <span class="site-layer-header-title" id="site-layer-title"></span>
+      <i class="fa fa-close" id="site-layer-close"></i>
+    </div>
+    <div class="site-layer-body" id="site-layer-container">
+      <div class="site-layer-input" id="site-layer-search" style="display: none;">
+        <input type="text">
+        <i class="fa fa-search"></i>
+      </div>
+      <div class="site-layer-reward" id="site-layer-reward" style="display: none;">
+        
+          <div>
+            <img src="/images/wechat.png" alt="WeChat">
+            
+              <p>WeChat</p>
+            
+          </div>
+        
+          <div>
+            <img src="/images/alipay.png" alt="AliPay">
+            
+              <p>AliPay</p>
+            
+          </div>
+        
+      </div>
+      <div id="site-layer-welcome" style="display:none;"></div>
+    </div>
+  </div>
+</div>
+    
+
+<div class="bottom-bar">
+  <div class="bottom-bar-left">
+    <a href="javascript:void(0);" data-enable="false">
+      <i class="fa fa-arrow-left"></i>
+    </a>
+    <a href="javascript:void(0);" data-enable="false">
+      <i class="fa fa-arrow-right"></i>
+    </a>
+  </div>
+  <div class="bottom-bar-right">
+    <a href="javascript:void(0);" data-enable="true" id="site-toc-show-btn">
+      <i class="fa fa-bars"></i>
+    </a>
+    
+      <a href="#site-comment" data-enable="true">
+        <i class="fa fa-commenting"></i>
+      </a>
+    
+    <a href="javascript:void(0);" id="site-toggle-share-btn">
+      <i class="fa fa-share-alt"></i>
+    </a>
+    <a href="javascript:void(0);" id="site-reward">
+      <i class="fa fa-thumbs-up"></i>
+    </a>
+    <a href="javascript:void(0);" id="back-top-btn">
+      <i class="fa fa-chevron-up"></i>
+    </a>
+  </div>
+</div>
+    <div id="share-btn">
+  
+  
+  
+  
+  
+</div>
+    
+
+
+
+
+
+    
+  </body>
+</html>
