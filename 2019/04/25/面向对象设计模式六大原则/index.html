@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html>
+  
+<head><meta name="generator" content="Hexo 3.8.0">
+  <meta charset="utf-8">
+  <meta name="author" content="gcfchn">
+  
+  
+  <title>面向对象设计模式六大原则 | Hexo</title>
+
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+
+  
+    <meta name="keywords" content="设计模式,设计模式,开发原则,编程思想,面向对象,">
+  
+
+  
+  <meta name="description" content="有软件开发经验的朋友应该有这样的体会：构建一个优秀的系统最困难之处不在于编码（Coding），而是在早期做出的设计（Design）上的决定。设计是软件开发生命周期中的关键阶段，好的设计能产生好的产品，而不当的设计则会影响最终产品的质量。设计的重要性已经深入人心，这从人们热烈讨论和研究设计模式就能看出来。设计模式是拥有多年开发设计经验的人给我们的经验传承，它是作为专家的建议而引入的，它背后的真正威力是其对真实世界的抽象。如果我们没有足够的经验，我们很难做出好的设计，但是富有经验的开发者和设计者以设计模式的形式将他们的经验传授给我们，拥有了这些经验之后，我们也能做出好的设计来了。不仅如此，设计模式还提高了我们软件复用的水平，从而提高了生产效率。本文对面向对象编程的设计模式的六大原则进行介绍。">
+
+  
+
+  <script src="//cdn.jsdelivr.net/npm/leancloud-storage@3.11.1/dist/av-min.js" async></script>
+
+  
+    <script type="text/javascript" src="//cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML" async></script>
+  
+
+  
+
+  
+
+  <script>
+  // theme-ad's config script
+  // it can be used in every script
+  
+  window.AD_CONFIG = {
+    leancloud: {"appid":"Hyq9wkH495DgNHWhDQCOfQSp-gzGzoHsz","appkey":"WaR7nrzhliHj9aVwdQzkdlGd","comment":false,"count":false},
+    welcome: {"enable":true,"interval":30},
+    start_time: "2016-12-10",
+    passwords: ["efe07af7441da2b69c4a41e42e73be4db47f66010a56900788a458354a7373ec", ],
+    is_post: true,
+    lock: false,
+    author: "gcfchn",
+    share: {"twitter":false,"facebook":false,"weibo":false,"qq":false,"wechat":false},
+    mathjax: true,
+    page_type: "",
+    root: "/"
+  };
+</script>
+
+  <script src="/vendor/sha256.min.js"></script>
+<script src="/js/auth.js"></script>
+<script src="/js/index.js"></script>
+<script src="/vendor/qrcode.min.js"></script>
+
+  
+    <link rel="icon" href="/images/favicon.ico">
+    <link rel="apple-touch-icon" href="/images/touch-icon.png">
+  
+
+  <link href="//netdna.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css" rel="stylesheet">
+
+  <link rel="stylesheet" href="/css/index.css">
+<link rel="stylesheet" href="/styles/components/highlight/highlight.css">
+
+  
+</head>
+  <body>
+    <header class="site-header">
+  <div class="site-header-brand">
+    
+      <span class="site-header-brand-title">
+        <a href="/">GCFCHN</a>
+      </span>
+    
+    
+      <span class="site-header-brand-motto"> | 安静写些东西</span>
+    
+  </div>
+  <div class="site-header-right">
+    <nav class="site-header-navigation">
+      
+        <a href="/" target="_self">首页</a>
+      
+        <a href="/archives/" target="_self">归档</a>
+      
+        <a href="/tags/" target="_self">标签</a>
+      
+        <a href="/categories/" target="_self">分类</a>
+      
+    </nav>
+    <div class="site-header-btn">
+      
+      <a href="javascript:void(0);" id="site-search">
+        <i class="fa fa-search"></i>
+      </a>
+      <a href="javascript:void(0);" id="site-nav-btn">
+        <i class="fa fa-ellipsis-v"></i>
+      </a>
+    </div>
+  </div>
+</header>
+<nav class="table-content" id="site-nav">
+  <div class="table-content-title">
+    <span>导航</span>
+  </div>
+  <div class="table-content-main">
+    <ol class="toc">
+      
+        <li class="toc-item">
+          <a href="/" target="_self">
+            首页
+          </a>
+        </li>
+      
+        <li class="toc-item">
+          <a href="/archives/" target="_self">
+            归档
+          </a>
+        </li>
+      
+        <li class="toc-item">
+          <a href="/tags/" target="_self">
+            标签
+          </a>
+        </li>
+      
+        <li class="toc-item">
+          <a href="/categories/" target="_self">
+            分类
+          </a>
+        </li>
+      
+    </ol>
+  </div>
+</nav>
+<div id="site-process"></div>
+    <main>
+      
+  <div class="passage">
+  <div class="passage-meta">
+    <span>
+      <i class="fa fa-calendar"></i>2019-04-25
+    </span>
+    
+      <span>
+        | <a href="/categories/设计模式/"><i class="fa fa-bookmark"></i>设计模式</a>
+      </span>
+    
+    
+      <span>
+        | <i class="fa fa-unlock-alt"></i>UNLOCK
+      </span>
+    
+  </div>
+  <h1 class="passage-title">
+    面向对象设计模式六大原则
+  </h1>
+  
+  <article class="passage-article">
+    <p></p>
+<h2 id="1-单一职责原则"><a href="#1-单一职责原则" class="headerlink" title="1.单一职责原则"></a>1.单一职责原则</h2><p>就一个类而言，只有一个引起它变化的原因。一个类值负责一个功能，解耦不同功能类。<br>举例：分开定义imageLoader的缓存实现类与图片展示的主类。</p>
+<h2 id="2-开闭原则"><a href="#2-开闭原则" class="headerlink" title="2.开闭原则"></a>2.开闭原则</h2><p>对扩展开放，对修改封闭。尽可能通过扩展来实现变化，而不是通过修改已有的代码来实现。避免修改时将错误引入到已经经过测试的代码中，破坏原有系统。实现开闭原则主要使用抽象。<br>举例：imageLoader的图片缓存使用策略模式。修改缓存策略时只要修改具体的缓存实现类，不需要改动ImageLoader类中的代码。</p>
+<h2 id="3-里氏替换原则"><a href="#3-里氏替换原则" class="headerlink" title="3.里氏替换原则"></a>3.里氏替换原则</h2><p>所有引用基类的地方，必须能透明的使用其子类对象。只要父类能出现的地方子类就可以出现，而且替换为子类也不会有任何错误和异常。通过抽象建立规范，具体的实现在运行时替换抽象，保证系统的灵活性和扩展性。通常利用里氏替换原则来实现开闭原则。<br>举例：imageLoader的图片缓存使用策略模式。ImageLoader类中依赖接口ImageCache，运行时利用内存缓存、磁盘缓存和双缓存实现类替换抽象类。</p>
+<h2 id="4-依赖倒置原则"><a href="#4-依赖倒置原则" class="headerlink" title="4.依赖倒置原则"></a>4.依赖倒置原则</h2><p>a.高层模块（调用端）不应该依赖于底层模块（具体实现类），两者都应该依赖其抽象；<br>b.抽象（接口或抽象类）不应该依赖细节（具体实现类）；<br>c.细节应该依赖抽象；<br>在java中的表现：模块间的依赖通过抽象发生，实现类之间不发生直接的依赖关系，其依赖是通过接口或者抽象类产生的。面向抽象编程。如果类与类之间直接依赖与细节，则它们之间存在着直接耦合，当具体的实现类要发生变化时，要同时修改依赖着的代码，限制了系统的可扩展性。<br>举例：imageLoader的图片缓存使用策略模式。ImageLoader类中依赖接口ImageCache，而不是具体的实现类。</p>
+<h2 id="5-接口隔离原则"><a href="#5-接口隔离原则" class="headerlink" title="5.接口隔离原则"></a>5.接口隔离原则</h2><p>客户端不应该依赖它不需要的接口。类间的依赖关系应该建立在最小的接口上。应该将庞大的接口，拆分成更小的、更具体的接口。<br>举例：CloseAble接口；ImageLoader中的ImageCache接口，只需要知道该接口的实现对象具有存、取缓存图片的功能。</p>
+<blockquote>
+<p>这五大原则可以归纳成三个关键字：抽象、单一职责、最小化。</p>
+</blockquote>
+<h2 id="6-最小知识原则"><a href="#6-最小知识原则" class="headerlink" title="6.最小知识原则"></a>6.最小知识原则</h2><p>又称迪米特原则。一个对象应对其它对象有最少的了解。与直接的朋友通信。一个类应该对自己要调用和耦合的类知道的最少，只需要知道它需要使用的方法即可，无需了解被调用类的内部实现。<br>举例：用户只要与直接的朋友ImageLoader类打交道，而不需要了解具体的图片缓存如何实现。</p>
+  </article>
+  <aside class="table-content" id="site-toc">
+  <div class="table-content-title">
+    <i class="fa fa-arrow-right fa-lg" id="site-toc-hide-btn"></i>
+    <span>目录</span>
+  </div>
+  <div class="table-content-main">
+    <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#1-单一职责原则"><span class="toc-text">1.单一职责原则</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#2-开闭原则"><span class="toc-text">2.开闭原则</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#3-里氏替换原则"><span class="toc-text">3.里氏替换原则</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#4-依赖倒置原则"><span class="toc-text">4.依赖倒置原则</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#5-接口隔离原则"><span class="toc-text">5.接口隔离原则</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#6-最小知识原则"><span class="toc-text">6.最小知识原则</span></a></li></ol>
+  </div>
+</aside>
+  
+    <aside class="passage-copyright">
+      <div>本文作者: gcfchn</div>
+      
+        <div>
+          原文链接: 
+          <a href target="_blank">http://yoursite.com/2019/04/25/面向对象设计模式六大原则/</a>
+        </div>
+      
+      <div>
+        著作权归作者所有。商业转载请联系作者获得授权，非商业转载请注明出处。
+      </div>
+    </aside>
+  
+  
+    <div class="passage-tags">
+     
+      <a href="/tags/设计模式/"><i class="fa fa-tags"></i>设计模式</a>
+     
+      <a href="/tags/开发原则/"><i class="fa fa-tags"></i>开发原则</a>
+     
+      <a href="/tags/编程思想/"><i class="fa fa-tags"></i>编程思想</a>
+     
+      <a href="/tags/面向对象/"><i class="fa fa-tags"></i>面向对象</a>
+    
+    </div>
+  
+</div>
+
+    </main>
+    
+    <div class="site-footer-wrapper">
+  <footer class="site-footer">
+    
+      <div class="site-footer-col">
+        <h5 class="site-footer-title">博客推荐</h5>
+        
+          <span class="site-footer-item">
+            <a href="https://blog.csdn.net/lmj623565791/" target="_blank">鸿洋</a>
+          </span>
+        
+          <span class="site-footer-item">
+            <a href="http://ruanyifeng.com/" target="_blank">阮一峰的个人网站</a>
+          </span>
+        
+      </div>
+    
+    <div class="site-footer-info">
+      <i class="fa fa-copyright"></i> 
+      2019. Created by gcfchn.
+      All rights reserved.
+    </div>
+  </footer>
+</div>
+    <div id="site-layer" style="display:none;">
+  <div class="site-layer-content">
+    <div class="site-layer-header">
+      <span class="site-layer-header-title" id="site-layer-title"></span>
+      <i class="fa fa-close" id="site-layer-close"></i>
+    </div>
+    <div class="site-layer-body" id="site-layer-container">
+      <div class="site-layer-input" id="site-layer-search" style="display: none;">
+        <input type="text">
+        <i class="fa fa-search"></i>
+      </div>
+      <div class="site-layer-reward" id="site-layer-reward" style="display: none;">
+        
+          <div>
+            <img src="/images/wechat.png" alt="WeChat">
+            
+              <p>WeChat</p>
+            
+          </div>
+        
+          <div>
+            <img src="/images/alipay.png" alt="AliPay">
+            
+              <p>AliPay</p>
+            
+          </div>
+        
+      </div>
+      <div id="site-layer-welcome" style="display:none;"></div>
+    </div>
+  </div>
+</div>
+    
+
+<div class="bottom-bar">
+  <div class="bottom-bar-left">
+    <a href="javascript:void(0);" data-enable="false">
+      <i class="fa fa-arrow-left"></i>
+    </a>
+    <a href="/2019/04/11/EventBus 3.0的使用与源码解析/" data-enable="true">
+      <i class="fa fa-arrow-right"></i>
+    </a>
+  </div>
+  <div class="bottom-bar-right">
+    <a href="javascript:void(0);" data-enable="true" id="site-toc-show-btn">
+      <i class="fa fa-bars"></i>
+    </a>
+    
+    <a href="javascript:void(0);" id="site-toggle-share-btn">
+      <i class="fa fa-share-alt"></i>
+    </a>
+    <a href="javascript:void(0);" id="site-reward">
+      <i class="fa fa-thumbs-up"></i>
+    </a>
+    <a href="javascript:void(0);" id="back-top-btn">
+      <i class="fa fa-chevron-up"></i>
+    </a>
+  </div>
+</div>
+    <div id="share-btn">
+  
+  
+  
+  
+  
+</div>
+    
+
+
+
+
+
+    
+  </body>
+</html>
